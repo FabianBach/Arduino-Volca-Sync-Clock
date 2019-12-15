@@ -28,7 +28,7 @@ unsigned long lastMainTick = -1;
 unsigned long nextMainTick = 0;
 float tickCount = 0;
 
-const float smallestMultiplier = 0.125; // == 1/8
+const float smallestMultiplier = 0.0625; // == 1/16
 const float largestMultilplier = 4;
 
 enum {MODE_GLOBAL, MODE_CHANNEL};
@@ -49,7 +49,7 @@ void setup() {
   pinMode(LED_BUILTIN, OUTPUT);
 
   FastLED.addLeds<WS2812B, LED_DATA_PIN, GRB>(leds, NUM_SYNC_OUT);//.setCorrection(TypicalLEDStrip);
-  FastLED.setBrightness(127);
+  FastLED.setBrightness(63);
   
   display.setBrightness(7); //0 to 7
 
@@ -71,7 +71,7 @@ void setup() {
   // Set the error correction delay in ms  (Default: 200)
   rotary.setErrorDelay(100);
 
-  Serial.begin(9600);
+  //Serial.begin(9600);
   //Serial.println(channels[0]...);
 }
 
@@ -135,7 +135,7 @@ void updateChannels(){
     // |____/|_____|_____|__|__| |_|    |____/|_____|_____|_____|_____|
     // 
     // see how late we can get
-    Serial.println(timeToNextMainTick);
+    //Serial.println(timeToNextMainTick);
   }
 
   // go through all channels
@@ -144,6 +144,14 @@ void updateChannels(){
     if (isPlaying && hasTicked){
       // check if enough time elapsed to set trigger high
       float volcaMultiplier = (channels[i].multiplier*2);
+
+//      if (i == 0){
+//        Serial.print(channels[i].multiplier); Serial.print(",");
+//        Serial.print(volcaMultiplier); Serial.print(",");
+//        Serial.print(fmod (tickCount, 1/volcaMultiplier)); Serial.print(",");
+//        Serial.println();
+//      }
+      
       if (fmod (tickCount, 1/volcaMultiplier) == 0){
         digitalWrite(channels[i].outputPin, HIGH);
         digitalWrite(channels[i].outputPin, LOW);
@@ -290,15 +298,16 @@ void updateLeds(){
   bool dirty = false;
 
   for(int i = 0; i < NUM_SYNC_OUT; i++) {
-    if (channels[i].triggerHigh && (fmod (tickCount, channels[i].multiplier) == 0)){
+    if (channels[i].triggerHigh && (fmod(tickCount, 1/channels[i].multiplier) == 0)){
       leds[i].red = 255;
       dirty = true;
     }
 
     if (modeActive == MODE_CHANNEL && selectedChannel == i){
       // if in channel mode set color of selected channel to white
+      
       if (leds[i].green == 0 || leds[i].blue == 0){
-        leds[i].red = leds[i].red > 32 ? leds[i].red : 32;
+        // leds[i].red = leds[i].red > 32 ? leds[i].red : 32;
         leds[i].green = 32;
         leds[i].blue = 32;
         dirty = true;
@@ -316,10 +325,12 @@ void updateLeds(){
 
   EVERY_N_MILLISECONDS(1000/PIXEL_FPS){
     // has to be iterated seperately
-    for(int i = 0; i < NUM_SYNC_OUT; i++) {
+    for (int i = 0; i < NUM_SYNC_OUT; i++) {
       if (!channels[i].triggerHigh){
-        int newVal = leds[i].red - 64;
-        leds[i].red = newVal > leds[i].blue ? newVal : leds[i].blue;
+        int newVal = leds[i].red - (mainBPM/2*channels[i].multiplier);
+        if (newVal < 0){ newVal = 0; }
+        // leds[i].red = newVal > leds[i].blue ? newVal : leds[i].blue;
+        leds[i].red = newVal;
         dirty = true; 
       }     
     }

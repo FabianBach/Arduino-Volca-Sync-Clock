@@ -22,10 +22,13 @@ SimpleRotary rotary(2,3,4);// Pin A, Pin B, Button Pin
 // MAIN STUFF
 int mainBPM = 120;
 bool isPlaying = false;
+unsigned long loopMillis = 0;
 
 unsigned long lastTrigger = -1;
 unsigned long lastMainTick = -1;
 unsigned long nextMainTick = 0;
+long timeToNextMainTick = 0;
+unsigned long timeSinceLastMainTick = 0;
 float tickCount = 0;
 
 const float smallestMultiplier = 0.0625; // == 1/16
@@ -87,10 +90,17 @@ void loop() {
   updateChannels();
 
   checkRotationInput();
-  checkButtonInput();
+  checkButtonInput();  
 
   updateLeds();
-  updateDisplay();
+
+  // one display update-cycle usually takes about 25ms
+  // so only update the display when we have enough time to do so
+  if (timeToNextMainTick > 40){
+    updateDisplay();
+  }
+  
+  //Serial.println();
 }
 
 
@@ -102,26 +112,20 @@ void loop() {
 //
 
 void updateChannels(){
+  // loop time:
+  // Serial.print(millis() - loopMillis); Serial.print(",");
+  
   bool hasTicked = false;
   bool isFirstTick = lastMainTick == -1;
-  unsigned long loopMillis = millis();
-
-  float largestBPM = mainBPM * largestMultilplier;
-  float oneMainTickInMillis = 60000 / largestBPM;
+  loopMillis = millis();
   
-  nextMainTick = isFirstTick ? loopMillis : (lastMainTick + (int) oneMainTickInMillis);
-  
-  unsigned long timeSinceLastMainTick = loopMillis - lastMainTick;
-  long timeToNextMainTick = nextMainTick - loopMillis;
+  nextMainTick = getTimeOfNextMainTick(loopMillis);
 
-  //Serial.println("");
-  //Serial.print("Tick Count: "); Serial.println(tickCount);
-  //Serial.print("Time: ");       Serial.println(loopMillis);
-  //Serial.print("Main BPM: ");   Serial.println(mainBPM);
-  //Serial.print("Tick BPM: ");   Serial.println(largestBPM);
-  //Serial.print("Tick Dur: ");   Serial.println(oneMainTickInMillis);
-  //Serial.print("Next Tick: ");  Serial.println(nextMainTick);
-  //Serial.print("Till Next: ");  Serial.println(timeToNextMainTick);
+  do {
+    loopMillis = millis();
+    timeSinceLastMainTick = loopMillis - lastMainTick;
+    timeToNextMainTick = nextMainTick - loopMillis;
+  } while (timeToNextMainTick > 0 && timeToNextMainTick < 5); // if very short is left, just wait right here  
 
   if (timeToNextMainTick <= 0){
     lastTrigger = loopMillis;
@@ -135,8 +139,9 @@ void updateChannels(){
     // |____/|_____|_____|__|__| |_|    |____/|_____|_____|_____|_____|
     // 
     // see how late we can get
-    //Serial.println(timeToNextMainTick);
+    // Serial.println(timeToNextMainTick);
   }
+  //Serial.print(timeToNextMainTick); Serial.print(",");
 
   // go through all channels
   for(int i = 0; i < NUM_SYNC_OUT; i++) {
@@ -144,13 +149,6 @@ void updateChannels(){
     if (isPlaying && hasTicked){
       // check if enough time elapsed to set trigger high
       float volcaMultiplier = (channels[i].multiplier*2);
-
-//      if (i == 0){
-//        Serial.print(channels[i].multiplier); Serial.print(",");
-//        Serial.print(volcaMultiplier); Serial.print(",");
-//        Serial.print(fmod (tickCount, 1/volcaMultiplier)); Serial.print(",");
-//        Serial.println();
-//      }
       
       if (fmod (tickCount, 1/volcaMultiplier) == 0){
         digitalWrite(channels[i].outputPin, HIGH);
@@ -167,7 +165,7 @@ void updateChannels(){
     //Serial.print(channels[i].triggerHigh ? 15 : 5); Serial.print(",");
   }
 
-  // Show MainTick on LED and in Serial
+  // Show MainTick on onboard LED
   if (fmod (tickCount, 1.0) == 0){
     //Serial.print(20); Serial.print(",");
     digitalWrite(LED_BUILTIN, HIGH);
@@ -177,9 +175,14 @@ void updateChannels(){
      digitalWrite(LED_BUILTIN, LOW);
     }
   }
+}
 
-  //Serial.println(((float)mainBPM / 10) + 20);
-  //Serial.println();
+long getTimeOfNextMainTick(unsigned long tickMillis){
+  bool isFirstTick = lastMainTick == -1;
+  float largestBPM = mainBPM * largestMultilplier;
+  float oneMainTickInMillis = 60000 / largestBPM;
+  long nextMainTick = isFirstTick ? tickMillis : (lastMainTick + (int) oneMainTickInMillis);
+  return nextMainTick;
 }
 
 
@@ -324,6 +327,7 @@ void updateLeds(){
   }
 
   EVERY_N_MILLISECONDS(1000/PIXEL_FPS){
+    // fade out red in speed of ticks
     // has to be iterated seperately
     for (int i = 0; i < NUM_SYNC_OUT; i++) {
       if (!channels[i].triggerHigh){
@@ -354,7 +358,7 @@ void updateDisplay(){
   //  if displayed value has changed
   //  if mode has changed
 
-  EVERY_N_MILLISECONDS(1000/DISPLAY_FPS){
+  //EVERY_N_MILLISECONDS(1000/DISPLAY_FPS){
     int contentToDisplay;
     bool showDivisionLines = false;
     const uint8_t divisionLines[] = {0x00, SEG_F};
@@ -390,5 +394,5 @@ void updateDisplay(){
         }
         break;
     }    
-  }
+  //}
 }

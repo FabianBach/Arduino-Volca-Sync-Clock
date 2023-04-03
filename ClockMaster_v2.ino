@@ -20,7 +20,9 @@ TM1637Display display(DISPLAY_CLK, DISPLAY_DIO);
 SimpleRotary rotary(2,3,4);// Pin A, Pin B, Button Pin
 
 // MAIN STUFF
-int mainBPM = 120;
+int mainBPM = 80;
+int BpmStepSize = 2;
+int maxBPM = 240; // Dont know how fast the trigger can be recieved. This is just some number.
 bool isPlaying = false;
 unsigned long loopMillis = 0;
 
@@ -69,10 +71,12 @@ void setup() {
   // Set the trigger to be either a HIGH or LOW pin (Default: HIGH)
   // Note this sets all three pins to use the same state.
   rotary.setTrigger(HIGH);
-  // Set the debounce delay in ms  (Default: 2)
-  rotary.setDebounceDelay(5);
-  // Set the error correction delay in ms  (Default: 200)
-  rotary.setErrorDelay(100);
+  // Set the debounce delay in ms  (Default: 2, Disable: 0)
+  // Higher values debounce better but may miss values.
+  rotary.setDebounceDelay(1);
+  // Set the error correction delay in ms  (Default: 200, Disable: 0)
+  // This keeps the direction until the rotation pauses for the given time  
+  rotary.setErrorDelay(500);
 
   //Serial.begin(9600);
   //Serial.println(channels[0]...);
@@ -209,10 +213,11 @@ void checkRotationInput(){
       
       case MODE_GLOBAL:
         if (turnDirection == 1){
-          mainBPM++;
+          mainBPM += BpmStepSize;
+          if (mainBPM > maxBPM){mainBPM = maxBPM;}
         }
         if (turnDirection == 2){
-          mainBPM--;
+          mainBPM -= BpmStepSize;
           if (mainBPM < 0){mainBPM = 0;}
         }
         break;

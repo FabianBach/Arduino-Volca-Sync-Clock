@@ -3,7 +3,7 @@
 #include "math.h"
 #include "SimpleRotary.h"
 
-#define NUM_SYNC_OUT 2
+#define NUM_SYNC_OUT 4
 
 /// LED STUFF
 #define PIXEL_FPS 16
@@ -46,13 +46,13 @@ struct CHANNEL {
 };
 typedef struct CHANNEL Channel;
 Channel channels[NUM_SYNC_OUT];
-int outputPins[NUM_SYNC_OUT] = {A0, A1}; // put em in there in the right order
+int outputPins[NUM_SYNC_OUT] = {9, 10, 11, 12}; // put em in there in the right order
 
 void setup() {
   pinMode(LED_BUILTIN, OUTPUT);
 
   FastLED.addLeds<WS2812B, LED_DATA_PIN, GRB>(leds, NUM_SYNC_OUT);//.setCorrection(TypicalLEDStrip);
-  FastLED.setBrightness(63);
+  FastLED.setBrightness(31);
   
   display.setBrightness(7); //0 to 7
 
@@ -152,13 +152,22 @@ void updateChannels(){
       
       if (fmod (tickCount, 1/volcaMultiplier) == 0){
         digitalWrite(channels[i].outputPin, HIGH);
-        digitalWrite(channels[i].outputPin, LOW);
+
+        // Setting the trigger low right after setting it high worked out for volcas, but not for other devices.
+        // Introducing a delay does cost performance and accuracy.
+        // Keeping this here as a reminder not to try again:
+        // delayMicroseconds(250); // still to short for Pocket Operators and Roland...
+        // digitalWrite(channels[i].outputPin, LOW);
 
         channels[i].triggerHigh = true;
         channels[i].lastTrigger = loopMillis;
       }
     
-    } else {
+    } else if (loopMillis - channels[i].lastTrigger >= 2){
+      // If 2 miliseconds have elapsed since last trigger, we return to low.
+      // A 2ms pulse is way more than we need, but works fine.
+      // Also tried a pulse duration of only 1ms, but that did not work for all devices.
+      digitalWrite(channels[i].outputPin, LOW);
       channels[i].triggerHigh = false;
     }
 

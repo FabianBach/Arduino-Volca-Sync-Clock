@@ -15,13 +15,14 @@ CRGB leds[NUM_SYNC_OUT]; // NUM_LEDS == NUM_SYNC_OUT
 const int DISPLAY_CLK = A5;
 const int DISPLAY_DIO = A4;
 TM1637Display display(DISPLAY_CLK, DISPLAY_DIO);
+bool displayShouldUpdate = true;
 
 /// INPUT STUFF
 SimpleRotary rotary(2,3,4);// Pin A, Pin B, Button Pin
 
 // MAIN STUFF
 int mainBPM = 80;
-int BpmStepSize = 2;
+int BpmStepSize = 1;
 int maxBPM = 240; // Dont know how fast the trigger can be recieved. This is just some number.
 bool isPlaying = false;
 unsigned long loopMillis = 0;
@@ -76,7 +77,7 @@ void setup() {
   rotary.setDebounceDelay(1);
   // Set the error correction delay in ms  (Default: 200, Disable: 0)
   // This keeps the direction until the rotation pauses for the given time  
-  rotary.setErrorDelay(500);
+  rotary.setErrorDelay(250);
 
   //Serial.begin(9600);
   //Serial.println(channels[0]...);
@@ -238,6 +239,10 @@ void checkRotationInput(){
         }
         break;
     }
+
+    if (turnDirection == 1 || turnDirection == 2){
+      displayShouldUpdate = true;
+    }
 }
 
 
@@ -284,6 +289,7 @@ void checkButtonInput(){
   if (longPushed && !stupidFlagINeed){
     modeActive = (modeActive == MODE_CHANNEL ? MODE_GLOBAL : MODE_CHANNEL);
     stupidFlagINeed = true;
+    displayShouldUpdate = true;
   
   } else if (shortPushed){
     switch(modeActive){
@@ -299,6 +305,7 @@ void checkButtonInput(){
         selectedChannel = (selectedChannel+1) % NUM_SYNC_OUT;
         break;
     }
+    displayShouldUpdate = true;
   }
 }
 
@@ -368,11 +375,8 @@ void updateLeds(){
 //
                                            
 void updateDisplay(){
-  // TODO: only if "dirty":
-  //  if displayed value has changed
-  //  if mode has changed
-
-  //EVERY_N_MILLISECONDS(1000/DISPLAY_FPS){
+  if (displayShouldUpdate){
+    
     int contentToDisplay;
     bool showDivisionLines = false;
     const uint8_t divisionLines[] = {0x00, SEG_F};
@@ -408,5 +412,7 @@ void updateDisplay(){
         }
         break;
     }    
-  //}
+  }
+
+  displayShouldUpdate = false;
 }
